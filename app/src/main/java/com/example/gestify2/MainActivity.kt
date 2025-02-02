@@ -31,29 +31,29 @@ class MainActivity : ComponentActivity() {
     private val clientId = "b233af9168d145bf89e3fa3b03f8f334"
     private val redirectUri = "com.example.gestify2://callback"
     private val REQUEST_CODE = 1337
-
     private var spotifyAppRemote: SpotifyAppRemote? = null
 
-    // Track URIs to choose from
     private val trackUris = listOf(
-        "spotify:track:11dFghVXANMlKmJXsNCbNl", // Example track 1
-        "spotify:track:11dFghVXANMlKmJXsNCbNl", // Example track 2
-        "spotify:track:11dFghVXANMlKmJXsNCbNl", // Example track 3
-        "spotify:track:11dFghVXANMlKmJXsNCbNl", // Example track 4
-        "spotify:track:11dFghVXANMlKmJXsNCbNl"  // Example track 5
+        "spotify:track:4xdBrk0nFZaP54vvZj0yx7", // Hot To Go
+        "spotify:track:2PmMh2t7jAtN6cqFooA0Xy", // Jolene
+        "spotify:track:2Y8BloifAHEn6GproQgPs7", // Silver Springs
+        "spotify:track:0RW1UL8w8rjQkaIaljaFc5", // Photo ID
+        "spotify:track:6dBUzqjtbnIa1TwYbyw5CM"  // Lover's Rock
     )
+
+    private val trackInfo = mutableStateOf("Track Info: ")
+    private val trackState = mutableStateOf("Not playing")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize composable content
         setContent {
-            MainScreen()
+            MainScreen(trackInfo, trackState)
         }
 
-        // Call the function to initiate the login process
         initiateSpotifyLogin()
     }
+
 
     private fun initiateSpotifyLogin() {
         val builder = AuthorizationRequest.Builder(clientId, AuthorizationResponse.Type.TOKEN, redirectUri)
@@ -83,6 +83,18 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    private fun subscribeToPlayerState() {
+        spotifyAppRemote?.playerApi?.subscribeToPlayerState()?.setEventCallback { playerState ->
+            playerState.track?.let { track ->
+                runOnUiThread {
+                    trackInfo.value = "Now Playing: ${track.name} by ${track.artist.name}"
+                    trackState.value = "Playing"
+                }
+            }
+        }?.setErrorCallback {
+            Log.e("Gestify", "Error subscribing to player state: ${it.message}")
+        }
+    }
 
     private fun connectToSpotify(accessToken: String) {
         val connectionParams = ConnectionParams.Builder(clientId)
@@ -94,6 +106,7 @@ class MainActivity : ComponentActivity() {
             override fun onConnected(spotifyAppRemote: SpotifyAppRemote) {
                 this@MainActivity.spotifyAppRemote = spotifyAppRemote
                 playRandomTrack()
+                subscribeToPlayerState()  // Subscribe to track changes after connecting
             }
 
             override fun onFailure(throwable: Throwable) {
@@ -101,6 +114,7 @@ class MainActivity : ComponentActivity() {
             }
         })
     }
+
 
     private fun playRandomTrack() {
         val randomTrackUri = trackUris[Random.nextInt(trackUris.size)]
@@ -113,23 +127,8 @@ class MainActivity : ComponentActivity() {
 
     // Composable function to display the UI
     @Composable
-    fun MainScreen() {
-        // Remember track state (whether it's playing)
-        val trackState = remember { mutableStateOf("Not playing") }
-        val trackInfo = remember { mutableStateOf("Track Info: ") }
-
-        // Subscribe to track changes
-        spotifyAppRemote?.playerApi?.subscribeToPlayerState()?.setEventCallback {
-            it.track?.let { track ->
-                trackInfo.value = "Now Playing: ${track.name} by ${track.artist.name}"
-                trackState.value = "Playing"
-            }
-        }
-
+    fun MainScreen(trackInfo: MutableState<String>, trackState: MutableState<String>) {
         Scaffold(
-            topBar = {
-                // You can add a TopAppBar here if needed
-            },
             content = { paddingValues ->
                 Column(modifier = Modifier.padding(paddingValues).padding(16.dp)) {
                     Text(text = "Gestify - Spotify Controller")
