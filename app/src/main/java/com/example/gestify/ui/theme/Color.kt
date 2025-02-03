@@ -1,4 +1,4 @@
-package com.example.gestify2.ui.theme
+package com.example.gestify.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

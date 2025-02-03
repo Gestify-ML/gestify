@@ -1,4 +1,4 @@
-package com.example.gestify2
+package com.example.gestify
 import android.media.AudioManager
 import android.content.Context
 import android.os.Bundle
@@ -23,7 +23,7 @@ import kotlin.random.Random
 class MainActivity : ComponentActivity() {
 
     private val clientId = "b233af9168d145bf89e3fa3b03f8f334"
-    private val redirectUri = "com.example.gestify2://callback"
+    private val redirectUri = "com.example.gestify://callback"
     private var spotifyAppRemote: SpotifyAppRemote? = null
 
     private val trackInfo = mutableStateOf("Track Info: ")

@@ -1,4 +1,4 @@
-package com.example.gestify2
+package com.example.gestify
 
 import org.junit.Test
 

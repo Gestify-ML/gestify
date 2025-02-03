@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "gestify2"
+rootProject.name = "gestify"
 include(":app")
  
