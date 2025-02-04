@@ -22,7 +22,8 @@ import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
 
-    private val clientId = "b233af9168d145bf89e3fa3b03f8f334"
+    private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
+
     private val redirectUri = "com.example.gestify://callback"
     private var spotifyAppRemote: SpotifyAppRemote? = null
 
