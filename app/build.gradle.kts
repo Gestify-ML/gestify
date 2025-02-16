@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.chaquopy)
 }
 
 android {
@@ -29,6 +30,9 @@ android {
         val spotifyClientId = localProperties["SPOTIFY_CLIENT_ID"] as String? ?: ""
         buildConfigField("String", "SPOTIFY_CLIENT_ID", spotifyClientId)
 
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
@@ -53,6 +57,19 @@ android {
     }
 }
 
+chaquopy {
+    defaultConfig {  version = "3.11"
+        pip {
+            // A requirement specifier, with or without a version number:
+            install("numpy")
+            // "-r"` followed by a requirements filename, relative to the
+            // project directory:
+            // install("-r", "requirements.txt")
+        }}
+    productFlavors { }
+    sourceSets { }
+}
+
 dependencies {
     implementation(libs.gson)
     implementation(libs.auth)
@@ -74,3 +91,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+
+
