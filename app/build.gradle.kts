@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.chaquopy)
+    alias(libs.plugins.kapt)
 }
 
 android {
@@ -54,6 +55,8 @@ android {
     buildFeatures {
         buildConfig = true
         compose = true
+        viewBinding = true
+        dataBinding = true
     }
 }
 
@@ -81,8 +84,19 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.video)
+    implementation(libs.androidx.constraintlayout)
+    // To use constraintlayout in compose
+    implementation(libs.androidx.constraintlayout.compose)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.camera.extensions)
     //noinspection GradlePath
     implementation(files("spotify-app-remote-release-0.8.0.aar"))
+    implementation(libs.androidx.appcompat)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

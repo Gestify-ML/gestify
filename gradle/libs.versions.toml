@@ -1,6 +1,10 @@
 [versions]
 agp = "8.8.0"
 auth = "1.2.5"
+cameraCamera2 = "androidx.camera"
+cameraCore = "1.4.1"
+constraintlayout = "2.2.0"
+constraintlayoutCompose = "1.1.0"
 gson = "2.10.1"
 kotlin = "2.0.0"
 coreKtx = "1.15.0"
@@ -11,8 +15,17 @@ lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.10.0"
 composeBom = "2024.04.01"
 spotifyAuth = "1.2.3"
+appcompat = "1.7.0"
 
 [libraries]
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraCamera2" }
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraCore" }
+androidx-camera-extensions = { module = "androidx.camera:camera-extensions", version.ref = "cameraCore" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraCore" }
+androidx-camera-video = { module = "androidx.camera:camera-video", version.ref = "cameraCore" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "cameraCore" }
+androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
+androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraintlayoutCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 auth = { module = "com.spotify.android:auth", version.ref = "auth" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
@@ -30,9 +43,11 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 spotify-auth = { module = "com.spotify.android:spotify-auth", version.ref = "spotifyAuth" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 chaquopy = { id = "com.chaquo.python", version = "16.0.0"}
+kapt = { id = "org.jetbrains.kotlin.kapt", version = "2.0.20" }
