@@ -50,10 +50,7 @@ package="com.example.gestify">
             android:theme="@style/Theme.Gestify">
         </activity>
 
-        <activity android:name=".TestingCamera"
-            android:exported="true"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-        </activity>
+
 
 
 

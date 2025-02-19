@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.chaquopy)
     alias(libs.plugins.kapt)
+    alias(libs.plugins.safe.args)
 }
 
 android {
@@ -60,18 +61,7 @@ android {
     }
 }
 
-chaquopy {
-    defaultConfig {  version = "3.11"
-        pip {
-            // A requirement specifier, with or without a version number:
-            install("numpy")
-            // "-r"` followed by a requirements filename, relative to the
-            // project directory:
-            // install("-r", "requirements.txt")
-        }}
-    productFlavors { }
-    sourceSets { }
-}
+
 
 dependencies {
     implementation(libs.gson)
@@ -97,6 +87,32 @@ dependencies {
     //noinspection GradlePath
     implementation(files("spotify-app-remote-release-0.8.0.aar"))
     implementation(libs.androidx.appcompat)
+
+
+
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui)
+
+
+
+
+    implementation (libs.tensorflow.lite.task.vision)
+    implementation(libs.material)
+
+    implementation(libs.tensorflow.lite.task.vision.v040)
+    // Import the GPU delegate plugin Library for GPU inference
+    implementation(libs.tensorflow.lite.gpu.delegate.plugin)
+    implementation(libs.tensorflow.lite.gpu)
+
+
+
+
+
+
+
+
+
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

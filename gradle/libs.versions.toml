@@ -14,8 +14,22 @@ espressoCore = "3.6.1"
 lifecycleRuntimeKtx = "2.8.7"
 activityCompose = "1.10.0"
 composeBom = "2024.04.01"
+material = "1.12.0"
+navigationFragmentKtx = "2.8.7"
+navigationUi = "2.8.7"
 spotifyAuth = "1.2.3"
 appcompat = "1.7.0"
+tensorflowLite = "2.0.0"
+tensorflowLiteGpu = "2.9.0"
+tensorflowLiteGpuDelegatePlugin = "0.4.0"
+tensorflowLiteSupport = "2.x.x"
+litertGpu = "1.1.2"
+navigationRuntimeAndroid = "2.9.0-alpha06"
+recyclerview = "1.4.0"
+litertSupportApi = "1.1.2"
+tensorflowLiteTaskVision = "0.4.4"
+navigationFragment = "2.8.7"
+tensorflowLiteTaskVisionVersion = "0.4.0"
 
 [libraries]
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraCamera2" }
@@ -27,6 +41,8 @@ androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "constraintlayoutCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-navigation-fragment-ktx = { module = "androidx.navigation:navigation-fragment-ktx", version.ref = "navigationFragmentKtx" }
+androidx-navigation-ui = { module = "androidx.navigation:navigation-ui", version.ref = "navigationUi" }
 auth = { module = "com.spotify.android:auth", version.ref = "auth" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -42,8 +58,21 @@ androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+material = { module = "com.google.android.material:material", version.ref = "material" }
 spotify-auth = { module = "com.spotify.android:spotify-auth", version.ref = "spotifyAuth" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+
+
+
+
+
+tensorflow-lite-gpu = { module = "org.tensorflow:tensorflow-lite-gpu", version.ref = "tensorflowLiteGpu" }
+tensorflow-lite-gpu-delegate-plugin = { module = "org.tensorflow:tensorflow-lite-gpu-delegate-plugin", version.ref = "tensorflowLiteGpuDelegatePlugin" }
+tensorflow-lite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tensorflowLiteTaskVision" }
+
+
+androidx-navigation-fragment = { group = "androidx.navigation", name = "navigation-fragment", version.ref = "navigationFragment" }
+tensorflow-lite-task-vision-v040 = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tensorflowLiteTaskVisionVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -51,3 +80,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 chaquopy = { id = "com.chaquo.python", version = "16.0.0"}
 kapt = { id = "org.jetbrains.kotlin.kapt", version = "2.0.20" }
+safe-args = {id ="androidx.navigation.safeargs.kotlin", version = "2.7.0" }
