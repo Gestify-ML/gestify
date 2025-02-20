@@ -9,7 +9,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
 import android.widget.Toast
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
@@ -24,7 +23,6 @@ import androidx.fragment.app.Fragment
 
 import androidx.navigation.Navigation
 
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.gestify.GestureClassifierHelper
 import com.example.gestify.R
 import com.example.gestify.databinding.FragmentCameraBinding
@@ -45,11 +43,7 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
 
     private lateinit var gestureClassifierHelper: GestureClassifierHelper
     private lateinit var bitmapBuffer: Bitmap
-    private val classificationResultsAdapter by lazy {
-        ClassificationResultsAdapter().apply {
-            updateAdapterSize(gestureClassifierHelper.maxResults)
-        }
-    }
+
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var camera: Camera? = null
@@ -99,10 +93,6 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
                 gestureClassifierListener = this
             )
 
-        with(fragmentCameraBinding.recyclerviewResults) {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = classificationResultsAdapter
-        }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -112,7 +102,7 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         }
 
         // Attach listeners to UI control widgets
-        initBottomSheetControls()
+
     }
 
     // Initialize CameraX, and prepare to bind the camera use cases
@@ -131,94 +121,7 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         )
     }
 
-    private fun initBottomSheetControls() {
-        // When clicked, lower classification score threshold floor
-        fragmentCameraBinding.bottomSheetLayout.thresholdMinus.setOnClickListener {
-            if (gestureClassifierHelper.threshold >= 0.1) {
-                gestureClassifierHelper.threshold -= 0.1f
-                updateControlsUi()
-            }
-        }
 
-        // When clicked, raise classification score threshold floor
-        fragmentCameraBinding.bottomSheetLayout.thresholdPlus.setOnClickListener {
-            if (gestureClassifierHelper.threshold < 0.9) {
-                gestureClassifierHelper.threshold += 0.1f
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, reduce the number of objects that can be classified at a time
-        fragmentCameraBinding.bottomSheetLayout.maxResultsMinus.setOnClickListener {
-            if (gestureClassifierHelper.maxResults > 1) {
-                gestureClassifierHelper.maxResults--
-                updateControlsUi()
-                classificationResultsAdapter.updateAdapterSize(size = gestureClassifierHelper.maxResults)
-            }
-        }
-
-        // When clicked, increase the number of objects that can be classified at a time
-        fragmentCameraBinding.bottomSheetLayout.maxResultsPlus.setOnClickListener {
-            if (gestureClassifierHelper.maxResults < 3) {
-                gestureClassifierHelper.maxResults++
-                updateControlsUi()
-                classificationResultsAdapter.updateAdapterSize(size = gestureClassifierHelper.maxResults)
-            }
-        }
-
-        // When clicked, decrease the number of threads used for classification
-        fragmentCameraBinding.bottomSheetLayout.threadsMinus.setOnClickListener {
-            if (gestureClassifierHelper.numThreads > 1) {
-                gestureClassifierHelper.numThreads--
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, increase the number of threads used for classification
-        fragmentCameraBinding.bottomSheetLayout.threadsPlus.setOnClickListener {
-            if (gestureClassifierHelper.numThreads < 4) {
-                gestureClassifierHelper.numThreads++
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, change the underlying hardware used for inference. Current options are CPU
-        // GPU, and NNAPI
-        fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.setSelection(
-            0,
-            false
-        )
-        fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    gestureClassifierHelper.currentDelegate = position
-                    updateControlsUi()
-                }
-
-                override fun onNothingSelected(parent: AdapterView<*>?) {
-                    /* no op */
-                }
-            }
-    }
-
-    // Update the values displayed in the bottom sheet. Reset classifier.
-    private fun updateControlsUi() {
-        fragmentCameraBinding.bottomSheetLayout.maxResultsValue.text =
-            gestureClassifierHelper.maxResults.toString()
-
-        fragmentCameraBinding.bottomSheetLayout.thresholdValue.text =
-            String.format(Locale.US, "%.2f", gestureClassifierHelper.threshold)
-        fragmentCameraBinding.bottomSheetLayout.threadsValue.text =
-            gestureClassifierHelper.numThreads.toString()
-        // Needs to be cleared instead of reinitialized because the GPU
-        // delegate needs to be initialized on the thread using it when applicable
-        gestureClassifierHelper.clearGestureClassifier()
-    }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
@@ -324,8 +227,6 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
     override fun onError(error: String) {
         activity?.runOnUiThread {
             Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()
-            classificationResultsAdapter.updateResults(null)
-            classificationResultsAdapter.notifyDataSetChanged()
         }
     }
 
@@ -335,11 +236,17 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         inferenceTime: Long
     ) {
         activity?.runOnUiThread {
-            // Show result on bottom sheet
-            classificationResultsAdapter.updateResults(results)
-            classificationResultsAdapter.notifyDataSetChanged()
-            fragmentCameraBinding.bottomSheetLayout.inferenceTimeVal.text =
-                String.format("%d ms", inferenceTime)
+            // Find the TextView and update it with the classification result
+            val resultText = results?.joinToString("\n") { classification ->
+                val label = classification.categories.firstOrNull()?.label ?: "No label"
+                val score = classification.categories.firstOrNull()?.score?.let {
+                    String.format(Locale.US, "%.2f", it)
+                } ?: "--"
+                "$label: $score"
+            } ?: "No results"
+
+            fragmentCameraBinding.tvClassificationResult.text = resultText
         }
     }
+
 }
