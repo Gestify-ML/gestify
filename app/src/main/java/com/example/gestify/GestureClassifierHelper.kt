@@ -65,7 +65,6 @@ class GestureClassifierHelper(
         val tensorImage = imageProcessor.process(TensorImage.fromBitmap(image))
 
         val results = gestureClassifier?.classify(tensorImage)
-        Log.d(TAG, "Gesture " + results)
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
         gestureClassifierListener?.onResults(results, inferenceTime)
     }

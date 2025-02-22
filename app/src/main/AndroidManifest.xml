@@ -45,11 +45,6 @@ package="com.example.gestify">
 
         </activity>
 
-        <activity android:name=".PythonKotlin"
-            android:exported="true"
-            android:theme="@style/Theme.Gestify">
-        </activity>
-
 
 
 

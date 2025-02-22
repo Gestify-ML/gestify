@@ -12,18 +12,49 @@
         android:layout_height="match_parent"
         app:scaleType="fillStart" />
 
-    <!-- RecyclerView at Bottom -->
+    <!-- Parent LinearLayout for Gesture and Music Status -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_gravity="bottom|center_horizontal"
+        android:background="@color/light_gray"
+        android:padding="16dp"
+    >
+
+    <!-- Gesture Classification Result -->
     <TextView
         android:id="@+id/tvClassificationResult"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Gesture Loading...."
         android:gravity="center"
-        android:background="@color/light_gray"
+        android:textColor="@color/gestify_main"
+        android:textSize="@dimen/bottom_sheet_text_size" />
+
+        <TextView
+            android:id="@+id/gestureClassified"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Classification:...."
+            android:gravity="center"
+            android:textColor="@color/gestify_main"
+            android:textSize="@dimen/bottom_sheet_text_size"
+            android:layout_marginTop="8dp" />
+
+    <!-- Music Status -->
+    <TextView
+        android:id="@+id/tvMusicStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Track Playing"
+        android:gravity="center"
         android:textColor="@color/gestify_main"
         android:textSize="@dimen/bottom_sheet_text_size"
-        android:layout_gravity="bottom|center_horizontal"
-        android:padding="16dp" />
+        android:layout_marginTop="8dp" /> <!-- Adds some space between gesture and music status -->
 
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
