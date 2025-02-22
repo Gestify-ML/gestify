@@ -20,6 +20,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 
+import com.example.gestify.SpotifyConnection
 
 import androidx.navigation.Navigation
 
@@ -41,8 +42,26 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
     private val fragmentCameraBinding
         get() = _fragmentCameraBinding!!
 
+    private var lastLabel: String? = null
+    private var lastLabelTimestamp: Long = 0
+    private val labelChangeThreshold = 3000L // 3 seconds
+
+    private lateinit var spotifyConnection: SpotifyConnection
+
     private lateinit var gestureClassifierHelper: GestureClassifierHelper
     private lateinit var bitmapBuffer: Bitmap
+
+    private val gestureToActionMap: Map<String, String> = mapOf(
+        "up" to "volumeUp",
+        "down" to "volumeDown",
+        "left" to "rewind",
+        "right" to "skip",
+        "leftclick" to "play",
+        "rightclick" to "pause",
+        "scrollup" to "mute",
+        "scrolldown" to "unmute"
+    )
+
 
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
@@ -80,6 +99,9 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         _fragmentCameraBinding =
             FragmentCameraBinding.inflate(inflater, container, false)
 
+        spotifyConnection = SpotifyConnection(requireContext(), fragmentCameraBinding.tvMusicStatus)
+        spotifyConnection.initiateSpotifyLogin(requireActivity())
+
         return fragmentCameraBinding.root
     }
 
@@ -100,9 +122,6 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
             // Set up the camera and its use cases
             setUpCamera()
         }
-
-        // Attach listeners to UI control widgets
-
     }
 
     // Initialize CameraX, and prepare to bind the camera use cases
@@ -237,16 +256,54 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
     ) {
         activity?.runOnUiThread {
             // Find the TextView and update it with the classification result
-            val resultText = results?.joinToString("\n") { classification ->
+            val label = results?.joinToString("\n") { classification ->
                 val label = classification.categories.firstOrNull()?.label ?: "No label"
+                label
+            } ?: "No results"
+            val resultText = results?.joinToString("\n") { classification ->
                 val score = classification.categories.firstOrNull()?.score?.let {
                     String.format(Locale.US, "%.2f", it)
                 } ?: "--"
                 "$label: $score"
             } ?: "No results"
 
+
             fragmentCameraBinding.tvClassificationResult.text = resultText
+
+            callSpotifyFunction(label)
+
+            if (label == lastLabel) {
+                if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
+                    // Call your function here since the label has been the same for 3 seconds
+                    callSpotifyFunction(label)
+                }
+            } else {
+                // If the label has changed, reset the timer
+                lastLabel = label
+                lastLabelTimestamp = System.currentTimeMillis()
+            }
+
+
         }
     }
 
+    private fun callSpotifyFunction(label: String) {
+        val action = gestureToActionMap[label]
+        fragmentCameraBinding.gestureClassified.text = action
+
+        if (spotifyConnection.isSpotifyConnected) {
+            //Log.d("Spotify", "WOULD BE CALLING " + action)
+            when (action) {
+                "play" -> spotifyConnection.resumeTrack()
+                "pause" -> spotifyConnection.pauseTrack()
+                "skip" -> spotifyConnection.skipTrack()
+                "rewind" -> spotifyConnection.rewindTrack()
+                "volumeUp" -> spotifyConnection.volumeUp()
+                "volumeDown" -> spotifyConnection.volumeDown()
+                "mute" -> spotifyConnection.mute()
+                "unmute" -> spotifyConnection.unmute()
+                else -> println("Unknown gesture")
+            }
+        }
+    }
 }
