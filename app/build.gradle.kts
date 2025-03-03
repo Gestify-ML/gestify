@@ -86,7 +86,7 @@ dependencies {
     implementation(libs.androidx.camera.extensions)
     //noinspection GradlePath
     implementation(files("spotify-app-remote-release-0.8.0.aar"))
-    implementation(libs.androidx.appcompat)
+    implementation(libs.tasks.vision)
 
 
 

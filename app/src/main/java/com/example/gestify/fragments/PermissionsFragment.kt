@@ -21,20 +21,28 @@ class PermissionsFragment : Fragment() {
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
             if (isGranted) {
-                Toast.makeText(context, "Permission request granted", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "Permission request granted",
+                    Toast.LENGTH_LONG
+                ).show()
                 navigateToCamera()
             } else {
-                Toast.makeText(context, "Permission request denied", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "Permission request denied",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        when {
+        when (PackageManager.PERMISSION_GRANTED) {
             ContextCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED -> {
+            ) -> {
                 navigateToCamera()
             }
             else -> {
@@ -47,8 +55,11 @@ class PermissionsFragment : Fragment() {
 
     private fun navigateToCamera() {
         lifecycleScope.launchWhenStarted {
-            Navigation.findNavController(requireActivity(), R.id.fragment_container).navigate(
-                PermissionsFragmentDirections.actionPermissionsToCamera()
+            Navigation.findNavController(
+                requireActivity(),
+                R.id.fragment_container
+            ).navigate(
+                R.id.action_permissions_to_camera
             )
         }
     }
@@ -57,7 +68,10 @@ class PermissionsFragment : Fragment() {
 
         /** Convenience method used to check if all permissions required by this app are granted */
         fun hasPermissions(context: Context) = PERMISSIONS_REQUIRED.all {
-            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                it
+            ) == PackageManager.PERMISSION_GRANTED
         }
     }
 }

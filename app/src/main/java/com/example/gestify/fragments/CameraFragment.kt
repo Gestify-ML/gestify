@@ -2,84 +2,94 @@ package com.example.gestify.fragments
 
 import android.annotation.SuppressLint
 import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
 import android.widget.Toast
-import androidx.camera.core.AspectRatio
-import androidx.camera.core.Camera
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-
-import com.example.gestify.SpotifyConnection
-
+import androidx.fragment.app.activityViewModels
 import androidx.navigation.Navigation
-
-import com.example.gestify.GestureClassifierHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.gestify.GestureRecognizerHelper
+import com.example.gestify.MainViewModel
 import com.example.gestify.R
+import com.example.gestify.SpotifyConnection
 import com.example.gestify.databinding.FragmentCameraBinding
-import org.tensorflow.lite.task.vision.classifier.Classifications
-import java.util.Locale
+import com.google.mediapipe.tasks.components.containers.Category
+
+import com.google.mediapipe.tasks.vision.core.RunningMode
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
-class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
+class CameraFragment : Fragment(),
+    GestureRecognizerHelper.GestureRecognizerListener {
 
     companion object {
-        private const val TAG = "Gesture Classifier"
+        private const val TAG = "Hand gesture recognizer"
     }
 
     private var _fragmentCameraBinding: FragmentCameraBinding? = null
+
     private val fragmentCameraBinding
         get() = _fragmentCameraBinding!!
 
-    private var lastLabel: String? = null
-    private var lastLabelTimestamp: Long = 0
-    private val labelChangeThreshold = 3000L // 3 seconds
-
     private lateinit var spotifyConnection: SpotifyConnection
 
-    private lateinit var gestureClassifierHelper: GestureClassifierHelper
-    private lateinit var bitmapBuffer: Bitmap
-
-    private val gestureToActionMap: Map<String, String> = mapOf(
-        "up" to "volumeUp",
-        "down" to "volumeDown",
-        "left" to "rewind",
-        "right" to "skip",
-        "leftclick" to "play",
-        "rightclick" to "pause",
-        "scrollup" to "mute",
-        "scrolldown" to "unmute"
-    )
-
-
+    private lateinit var gestureRecognizerHelper: GestureRecognizerHelper
+    private val viewModel: MainViewModel by activityViewModels()
+    private var defaultNumResults = 1
+    private val gestureRecognizerResultAdapter: GestureRecognizerResultsAdapter by lazy {
+        GestureRecognizerResultsAdapter().apply {
+            updateAdapterSize(defaultNumResults)
+        }
+    }
     private var preview: Preview? = null
     private var imageAnalyzer: ImageAnalysis? = null
     private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
+    private var cameraFacing = CameraSelector.LENS_FACING_FRONT
 
-    /** Blocking camera operations are performed using this executor */
-    private lateinit var cameraExecutor: ExecutorService
+    /** Blocking ML operations are performed using this executor */
+    private lateinit var backgroundExecutor: ExecutorService
+
+    private var lastSkipTime: Long = 0
+    private val skipCooldownTime: Long = 2000
 
     override fun onResume() {
         super.onResume()
-
         if (!PermissionsFragment.hasPermissions(requireContext())) {
             Navigation.findNavController(
-                requireActivity(),
-                R.id.fragment_container
-            )
-                .navigate(CameraFragmentDirections.actionCameraToPermissions())
+                requireActivity(), R.id.fragment_container
+            ).navigate(R.id.action_camera_to_permissions)
+        }
+
+        // Start the GestureRecognizerHelper again when users come back
+        // to the foreground.
+        backgroundExecutor.execute {
+            if (gestureRecognizerHelper.isClosed()) {
+                gestureRecognizerHelper.setupGestureRecognizer()
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (this::gestureRecognizerHelper.isInitialized) {
+            viewModel.setMinHandDetectionConfidence(gestureRecognizerHelper.minHandDetectionConfidence)
+            viewModel.setMinHandTrackingConfidence(gestureRecognizerHelper.minHandTrackingConfidence)
+            viewModel.setMinHandPresenceConfidence(gestureRecognizerHelper.minHandPresenceConfidence)
+            viewModel.setDelegate(gestureRecognizerHelper.currentDelegate)
+
+            // Close the Gesture Recognizer helper and release resources
+            backgroundExecutor.execute { gestureRecognizerHelper.clearGestureRecognizer() }
         }
     }
 
@@ -88,7 +98,10 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         super.onDestroyView()
 
         // Shut down our background executor
-        cameraExecutor.shutdown()
+        backgroundExecutor.shutdown()
+        backgroundExecutor.awaitTermination(
+            Long.MAX_VALUE, TimeUnit.NANOSECONDS
+        )
     }
 
     override fun onCreateView(
@@ -99,29 +112,173 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         _fragmentCameraBinding =
             FragmentCameraBinding.inflate(inflater, container, false)
 
-        spotifyConnection = SpotifyConnection(requireContext(), fragmentCameraBinding.tvMusicStatus)
-        spotifyConnection.initiateSpotifyLogin(requireActivity())
-
         return fragmentCameraBinding.root
     }
 
     @SuppressLint("MissingPermission")
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        with(fragmentCameraBinding.recyclerviewResults) {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = gestureRecognizerResultAdapter
+        }
 
-        gestureClassifierHelper =
-            GestureClassifierHelper(
-                context = requireContext(),
-                gestureClassifierListener = this
-            )
+        // Initialize our background executor
+        backgroundExecutor = Executors.newSingleThreadExecutor()
 
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
-
+        // Wait for the views to be properly laid out
         fragmentCameraBinding.viewFinder.post {
             // Set up the camera and its use cases
             setUpCamera()
         }
+
+        spotifyConnection = SpotifyConnection(requireContext())
+
+        // Observe the music state
+        spotifyConnection.musicState.observe(viewLifecycleOwner) { musicStatus ->
+            // Update the UI based on the music status
+            // For example, update the text in your TextView or RecyclerView
+            gestureRecognizerResultAdapter.updateMusicStatus(musicStatus)
+        }
+
+        // Start Spotify connection process
+        spotifyConnection.initiateSpotifyLogin(requireActivity())
+
+        // Create the Hand Gesture Recognition Helper that will handle the
+        // inference
+        backgroundExecutor.execute {
+            gestureRecognizerHelper = GestureRecognizerHelper(
+                context = requireContext(),
+                runningMode = RunningMode.LIVE_STREAM,
+                minHandDetectionConfidence = viewModel.currentMinHandDetectionConfidence,
+                minHandTrackingConfidence = viewModel.currentMinHandTrackingConfidence,
+                minHandPresenceConfidence = viewModel.currentMinHandPresenceConfidence,
+                currentDelegate = viewModel.currentDelegate,
+                gestureRecognizerListener = this
+            )
+        }
+
+        // Attach listeners to UI control widgets
+        initBottomSheetControls()
+    }
+
+    private fun initBottomSheetControls() {
+        // init bottom sheet settings
+        fragmentCameraBinding.bottomSheetLayout.detectionThresholdValue.text =
+            String.format(
+                Locale.US, "%.2f", viewModel.currentMinHandDetectionConfidence
+            )
+        fragmentCameraBinding.bottomSheetLayout.trackingThresholdValue.text =
+            String.format(
+                Locale.US, "%.2f", viewModel.currentMinHandTrackingConfidence
+            )
+        fragmentCameraBinding.bottomSheetLayout.presenceThresholdValue.text =
+            String.format(
+                Locale.US, "%.2f", viewModel.currentMinHandPresenceConfidence
+            )
+
+        // When clicked, lower hand detection score threshold floor
+        fragmentCameraBinding.bottomSheetLayout.detectionThresholdMinus.setOnClickListener {
+            if (gestureRecognizerHelper.minHandDetectionConfidence >= 0.2) {
+                gestureRecognizerHelper.minHandDetectionConfidence -= 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, raise hand detection score threshold floor
+        fragmentCameraBinding.bottomSheetLayout.detectionThresholdPlus.setOnClickListener {
+            if (gestureRecognizerHelper.minHandDetectionConfidence <= 0.8) {
+                gestureRecognizerHelper.minHandDetectionConfidence += 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, lower hand tracking score threshold floor
+        fragmentCameraBinding.bottomSheetLayout.trackingThresholdMinus.setOnClickListener {
+            if (gestureRecognizerHelper.minHandTrackingConfidence >= 0.2) {
+                gestureRecognizerHelper.minHandTrackingConfidence -= 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, raise hand tracking score threshold floor
+        fragmentCameraBinding.bottomSheetLayout.trackingThresholdPlus.setOnClickListener {
+            if (gestureRecognizerHelper.minHandTrackingConfidence <= 0.8) {
+                gestureRecognizerHelper.minHandTrackingConfidence += 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, lower hand presence score threshold floor
+        fragmentCameraBinding.bottomSheetLayout.presenceThresholdMinus.setOnClickListener {
+            if (gestureRecognizerHelper.minHandPresenceConfidence >= 0.2) {
+                gestureRecognizerHelper.minHandPresenceConfidence -= 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, raise hand presence score threshold floor
+        fragmentCameraBinding.bottomSheetLayout.presenceThresholdPlus.setOnClickListener {
+            if (gestureRecognizerHelper.minHandPresenceConfidence <= 0.8) {
+                gestureRecognizerHelper.minHandPresenceConfidence += 0.1f
+                updateControlsUi()
+            }
+        }
+
+        // When clicked, change the underlying hardware used for inference.
+        // Current options are CPU and GPU
+        fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.setSelection(
+            viewModel.currentDelegate, false
+        )
+        fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.onItemSelectedListener =
+            object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long
+                ) {
+                    try {
+                        gestureRecognizerHelper.currentDelegate = p2
+                        updateControlsUi()
+                    } catch(e: UninitializedPropertyAccessException) {
+                        Log.e(TAG, "GestureRecognizerHelper has not been initialized yet.")
+
+                    }
+                }
+
+                override fun onNothingSelected(p0: AdapterView<*>?) {
+                    /* no op */
+                }
+            }
+    }
+
+    // Update the values displayed in the bottom sheet. Reset recognition
+    // helper.
+    private fun updateControlsUi() {
+        fragmentCameraBinding.bottomSheetLayout.detectionThresholdValue.text =
+            String.format(
+                Locale.US,
+                "%.2f",
+                gestureRecognizerHelper.minHandDetectionConfidence
+            )
+        fragmentCameraBinding.bottomSheetLayout.trackingThresholdValue.text =
+            String.format(
+                Locale.US,
+                "%.2f",
+                gestureRecognizerHelper.minHandTrackingConfidence
+            )
+        fragmentCameraBinding.bottomSheetLayout.presenceThresholdValue.text =
+            String.format(
+                Locale.US,
+                "%.2f",
+                gestureRecognizerHelper.minHandPresenceConfidence
+            )
+
+        // Needs to be cleared instead of reinitialized because the GPU
+        // delegate needs to be initialized on the thread using it when applicable
+        backgroundExecutor.execute {
+            gestureRecognizerHelper.clearGestureRecognizer()
+            gestureRecognizerHelper.setupGestureRecognizer()
+        }
+        fragmentCameraBinding.overlay.clear()
     }
 
     // Initialize CameraX, and prepare to bind the camera use cases
@@ -135,17 +292,8 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
 
                 // Build and bind the camera use cases
                 bindCameraUseCases()
-            },
-            ContextCompat.getMainExecutor(requireContext())
+            }, ContextCompat.getMainExecutor(requireContext())
         )
-    }
-
-
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        imageAnalyzer?.targetRotation =
-            fragmentCameraBinding.viewFinder.display.rotation
     }
 
     // Declare and bind preview, capture and analysis use cases
@@ -153,45 +301,28 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
     private fun bindCameraUseCases() {
 
         // CameraProvider
-        val cameraProvider =
-            cameraProvider
-                ?: throw IllegalStateException("Camera initialization failed.")
+        val cameraProvider = cameraProvider
+            ?: throw IllegalStateException("Camera initialization failed.")
 
-        // CameraSelector - makes assumption that we're only using the front
-        // camera
         val cameraSelector =
-            CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_FRONT).build()
+            CameraSelector.Builder().requireLensFacing(cameraFacing).build()
 
         // Preview. Only using the 4:3 ratio because this is the closest to our models
-        preview =
-            Preview.Builder()
-                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                .setTargetRotation(fragmentCameraBinding.viewFinder.display.rotation)
-                .build()
+        preview = Preview.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3)
+            .setTargetRotation(fragmentCameraBinding.viewFinder.display.rotation)
+            .build()
 
         // ImageAnalysis. Using RGBA 8888 to match how our models work
         imageAnalyzer =
-            ImageAnalysis.Builder()
-                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+            ImageAnalysis.Builder().setTargetAspectRatio(AspectRatio.RATIO_4_3)
                 .setTargetRotation(fragmentCameraBinding.viewFinder.display.rotation)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
                 // The analyzer can then be assigned to the instance
                 .also {
-                    it.setAnalyzer(cameraExecutor) { image ->
-                        if (!::bitmapBuffer.isInitialized) {
-                            // The image rotation and RGB image buffer are initialized only once
-                            // the analyzer has started running
-                            bitmapBuffer = Bitmap.createBitmap(
-                                image.width,
-                                image.height,
-                                Bitmap.Config.ARGB_8888
-                            )
-                        }
-
-                        classifyImage(image)
+                    it.setAnalyzer(backgroundExecutor) { image ->
+                        recognizeHand(image)
                     }
                 }
 
@@ -202,10 +333,7 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
             // A variable number of use-cases can be passed here -
             // camera provides access to CameraControl & CameraInfo
             camera = cameraProvider.bindToLifecycle(
-                this,
-                cameraSelector,
-                preview,
-                imageAnalyzer
+                this, cameraSelector, preview, imageAnalyzer
             )
 
             // Attach the viewfinder's surface provider to preview use case
@@ -215,94 +343,96 @@ class CameraFragment : Fragment(), GestureClassifierHelper.ClassifierListener {
         }
     }
 
-    private fun classifyImage(image: ImageProxy) {
-        // Copy out RGB bits to the shared bitmap buffer
-        image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
-
-        // Because we use front camera so we need flip the bitmap before
-        // classify
-        val flipMatrix = Matrix().apply {
-            postScale(
-                -1f,
-                1f,
-                bitmapBuffer.width / 2f,
-                bitmapBuffer.height / 2f
-            )
-        }
-
-        val flippedBitmap = Bitmap.createBitmap(
-            bitmapBuffer, 0, 0,
-            bitmapBuffer.width, bitmapBuffer.height, flipMatrix, true
+    private fun recognizeHand(imageProxy: ImageProxy) {
+        gestureRecognizerHelper.recognizeLiveStream(
+            imageProxy = imageProxy,
         )
-
-        // calculate rotation degrees after flip image
-        val imageRotation = 180 - image.imageInfo.rotationDegrees
-        // Pass Bitmap and rotation to the gesture classifier helper for
-        // processing and classification
-        gestureClassifierHelper.classify(flippedBitmap, imageRotation)
     }
 
-    @SuppressLint("NotifyDataSetChanged")
-    override fun onError(error: String) {
-        activity?.runOnUiThread {
-            Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()
-        }
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        imageAnalyzer?.targetRotation =
+            fragmentCameraBinding.viewFinder.display.rotation
     }
 
-    @SuppressLint("NotifyDataSetChanged")
+    // Update UI after a hand gesture has been recognized. Extracts original
+    // image height/width to scale and place the landmarks properly through
+    // OverlayView. Only one result is expected at a time. If two or more
+    // hands are seen in the camera frame, only one will be processed.
     override fun onResults(
-        results: List<Classifications>?,
-        inferenceTime: Long
+        resultBundle: GestureRecognizerHelper.ResultBundle
     ) {
         activity?.runOnUiThread {
-            // Find the TextView and update it with the classification result
-            val label = results?.joinToString("\n") { classification ->
-                val label = classification.categories.firstOrNull()?.label ?: "No label"
-                label
-            } ?: "No results"
-            val resultText = results?.joinToString("\n") { classification ->
-                val score = classification.categories.firstOrNull()?.score?.let {
-                    String.format(Locale.US, "%.2f", it)
-                } ?: "--"
-                "$label: $score"
-            } ?: "No results"
+            if (_fragmentCameraBinding != null) {
+                // Show result of recognized gesture
+                val gestureCategories = resultBundle.results.first().gestures()
 
 
-            fragmentCameraBinding.tvClassificationResult.text = resultText
 
-            callSpotifyFunction(label)
-
-            if (label == lastLabel) {
-                if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
-                    // Call your function here since the label has been the same for 3 seconds
-                    callSpotifyFunction(label)
+                if (gestureCategories.isNotEmpty()) {
+                    if (gestureCategories.first()[0] is Category) {
+                        val categoryName = gestureCategories.first()[0].categoryName()
+                        callSpotifyFunction(categoryName)
+                    } else {
+                        Log.e("CategoryError", "Not an instance of AutoValue_Category")
+                    }
+                    gestureRecognizerResultAdapter.updateGestureCategories(
+                        gestureCategories.first()
+                    )
+                } else {
+                    gestureRecognizerResultAdapter.updateGestureCategories(emptyList())
                 }
-            } else {
-                // If the label has changed, reset the timer
-                lastLabel = label
-                lastLabelTimestamp = System.currentTimeMillis()
+
+                fragmentCameraBinding.bottomSheetLayout.inferenceTimeVal.text =
+                    String.format("%d ms", resultBundle.inferenceTime)
+
+                // Pass necessary information to OverlayView for drawing on the canvas
+                fragmentCameraBinding.overlay.setResults(
+                    resultBundle.results.first(),
+                    resultBundle.inputImageHeight,
+                    resultBundle.inputImageWidth,
+                    RunningMode.LIVE_STREAM
+                )
+
+                // Force a redraw
+                fragmentCameraBinding.overlay.invalidate()
             }
-
-
         }
     }
 
-    private fun callSpotifyFunction(label: String) {
-        val action = gestureToActionMap[label]
-        fragmentCameraBinding.gestureClassified.text = action
-
+    private fun callSpotifyFunction(gesture: String) {
         if (spotifyConnection.isSpotifyConnected) {
             //Log.d("Spotify", "WOULD BE CALLING " + action)
-            when (action) {
-                "play" -> spotifyConnection.resumeTrack()
-                "pause" -> spotifyConnection.pauseTrack()
-                "skip" -> spotifyConnection.skipTrack()
-                "rewind" -> spotifyConnection.rewindTrack()
-                "volumeUp" -> spotifyConnection.volumeUp()
-                "volumeDown" -> spotifyConnection.volumeDown()
-                "mute" -> spotifyConnection.mute()
-                "unmute" -> spotifyConnection.unmute()
+            when (gesture) {
+                "Open_Palm" -> spotifyConnection.resumeTrack()
+                "Closed_Fist" -> spotifyConnection.pauseTrack()
+                "Pointing_Up" -> skipIfNotInCooldown()
+                "Thumb_Up" -> spotifyConnection.volumeUp()
+                "Thumb_Down" -> spotifyConnection.volumeDown()
                 else -> println("Unknown gesture")
+            }
+        }
+    }
+
+    private fun skipIfNotInCooldown() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastSkipTime > skipCooldownTime) {
+            spotifyConnection.skipTrack()
+            lastSkipTime = currentTime
+        } else {
+            Log.d("GestureRecognizer", "Skip action ignored due to cooldown")
+        }
+    }
+
+    override fun onError(error: String, errorCode: Int) {
+        activity?.runOnUiThread {
+            Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()
+            gestureRecognizerResultAdapter.updateGestureCategories(emptyList())
+
+            if (errorCode == GestureRecognizerHelper.GPU_ERROR) {
+                fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.setSelection(
+                    GestureRecognizerHelper.DELEGATE_CPU, false
+                )
             }
         }
     }

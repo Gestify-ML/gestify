@@ -6,6 +6,8 @@ import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
 import com.spotify.android.appremote.api.SpotifyAppRemote
@@ -14,15 +16,15 @@ import com.spotify.sdk.android.auth.AuthorizationRequest
 import com.spotify.sdk.android.auth.AuthorizationResponse
 import kotlin.random.Random
 
-class SpotifyConnection(private val context: Context, private val musicStatus: TextView) {
+class SpotifyConnection(private val context: Context) {
 
     private var spotifyAppRemote: SpotifyAppRemote? = null
     private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
     private val redirectUri = "com.example.gestify://callback"
 
 
-    private val trackInfo = mutableStateOf("Track Info: ")
-    private val trackState = mutableStateOf("Not playing")
+    private val trackState = MutableLiveData<String>("Not playing")  // LiveData for track state
+
 
     private val trackUris = listOf(
         "spotify:track:4xdBrk0nFZaP54vvZj0yx7",
@@ -31,6 +33,10 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
         "spotify:track:0RW1UL8w8rjQkaIaljaFc5",
         "spotify:track:6dBUzqjtbnIa1TwYbyw5CM"
     )
+
+    // LiveData to observe music status in the UI
+    val musicState: LiveData<String> = trackState
+
 
     public var isSpotifyConnected: Boolean = false
 
@@ -76,7 +82,7 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
             trackState.value = if (playerState.isPaused) "Paused: " else "Playing: "
             trackState.value += playerState.track.name
 
-            musicStatus.text = trackState.value
+            //UPDATE musicStatus.text = trackState.value
         }?.setErrorCallback { throwable ->
             Log.e("Gestify", "Error subscribing to player state: ${throwable?.message ?: "Unknown error"}")
         }

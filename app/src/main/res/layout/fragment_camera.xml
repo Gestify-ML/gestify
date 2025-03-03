@@ -1,60 +1,42 @@
-<androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/camera_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Camera Preview -->
     <androidx.camera.view.PreviewView
         android:id="@+id/view_finder"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:scaleType="fillStart" />
 
-    <!-- Parent LinearLayout for Gesture and Music Status -->
-    <LinearLayout
+    <com.example.gestify.OverlayView
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <include
+        android:id="@+id/bottom_sheet_layout"
+        layout="@layout/info_bottom_sheet" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerview_results"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:layout_gravity="bottom|center_horizontal"
-        android:background="@color/light_gray"
-        android:padding="16dp"
-    >
+        android:layout_gravity="top"
+        android:layout_marginBottom="@dimen/bottom_sheet_peek_height"
+        android:background="@color/dark_gray"
+        android:clipToPadding="true"
+        android:padding="@dimen/bottom_sheet_padding"
+        app:layout_anchor="@id/bottom_sheet_layout"
+        app:layout_anchorGravity="top"
+        app:layout_behavior="com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior" />
 
-    <!-- Gesture Classification Result -->
-    <TextView
-        android:id="@+id/tvClassificationResult"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Gesture Loading...."
-        android:gravity="center"
-        android:textColor="@color/gestify_main"
-        android:textSize="@dimen/bottom_sheet_text_size" />
-
-        <TextView
-            android:id="@+id/gestureClassified"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Classification:...."
-            android:gravity="center"
-            android:textColor="@color/gestify_main"
-            android:textSize="@dimen/bottom_sheet_text_size"
-            android:layout_marginTop="8dp" />
-
-    <!-- Music Status -->
-    <TextView
-        android:id="@+id/tvMusicStatus"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Track Playing"
-        android:gravity="center"
-        android:textColor="@color/gestify_main"
-        android:textSize="@dimen/bottom_sheet_text_size"
-        android:layout_marginTop="8dp" /> <!-- Adds some space between gesture and music status -->
-
-
-</LinearLayout>
-
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+    <View
+        android:layout_width="wrap_content"
+        android:layout_height="1dp"
+        android:background="@color/gestify_main"
+        app:layout_anchor="@id/recyclerview_results"
+        app:layout_anchorGravity="bottom" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

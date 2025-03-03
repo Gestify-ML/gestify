@@ -1,37 +1,37 @@
 <resources>
-<string name="app_name">Gestify</string>
-<string name="take_photo">Take Photo</string>
-<string name="start_capture">Start Capture</string>
-<string name="stop_capture">Stop Capture</string>
+    <string name="app_name">Gestify</string>
 
-
+    <string name="gestify">Gestify</string>
 
     <string name="alt_bottom_sheet_chevron">Bottom sheet expandable indicator</string>
 
-    <string name="alt_bottom_sheet_max_results_button_minus">Decreasing maximum classified results
+    <string name="alt_bottom_sheet_max_results_button_minus">Decreasing
+        maximum recognized results button</string>
+    <string name="alt_bottom_sheet_max_results_button_plus">Increasing maximum recognized results
         button</string>
-    <string name="alt_bottom_sheet_max_results_button_plus">Increasing maximum classified results
-        button</string>
-    <string name="alt_bottom_sheet_threshold_button_minus">Decreasing threshold of classified image
-        results button</string>
-    <string name="alt_bottom_sheet_threshold_button_plus">Increasing threshold of classified image
-        results button</string>
+    <string name="alt_bottom_sheet_threshold_button_minus">Decreasing
+        threshold of recognized hand gesture results button</string>
+    <string name="alt_bottom_sheet_threshold_button_plus">Increasing
+        threshold of recognized hand gesture results button</string>
     <string name="alt_bottom_sheet_thread_button_minus">Decrease the number of threads used</string>
     <string name="alt_bottom_sheet_thread_button_plus">Increase the number of threads used</string>
+    <string name="menu_camera">Camera</string>
+    <string name="menu_gallery">Gallery</string>
+    <string name="tv_gallery_placeholder">Click + to add an image or a video
+        to begin running the gesture recognizer.</string>
 
     <string name="label_inference_time">Inference Time</string>
     <string name="label_fps">Frames per Second</string>
-    <string name="label_confidence_threshold">Threshold</string>
-    <string name="label_max_results">Max Results</string>
-    <string name="label_threads">Number of Threads</string>
+    <string name="label_hand_detection_confidence_threshold">Detection
+        Threshold</string>
+    <string name="label_hand_tracking_confidence_threshold">Tracking
+        Threshold</string>
+    <string name="label_hand_presence_confidence_threshold">Presence
+        Threshold</string>
     <string name="label_delegate">Delegate</string>
-    <string name="default_threshold">0.50</string>
-    <string name="default_inference_time">0ms</string>
-    <string name="default_max_results">3</string>
 
     <string-array name="delegate_spinner_titles">
         <item>CPU</item>
         <item>GPU</item>
-        <item>NNAPI</item>
     </string-array>
 </resources>
