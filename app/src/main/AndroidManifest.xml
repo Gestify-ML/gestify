@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:tools="http://schemas.android.com/tools">
 
-package="com.example.gestify">
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"
+        tools:ignore="ScopedStorage" />
 
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="true" />
 
     <application
         android:allowBackup="true"
@@ -23,23 +31,20 @@ package="com.example.gestify">
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Gestify">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-
             <intent-filter>
-                 <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.example.gestify" android:host="callback" />
+                <data
+                    android:scheme="${redirectSchemeName}"
+                    android:host="${redirectHostName}" />
             </intent-filter>
-
         </activity>
-
     </application>
-
-
 </manifest>
