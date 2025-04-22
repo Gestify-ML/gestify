@@ -139,9 +139,12 @@ class CameraFragment : Fragment() {
             val detections = detectionHelper.detectWithDetails(bitmap)
             Log.d(TAG, "Processed 640x640 image, detections: ${detections.size}")
 
-            logDetections(detections)
-            updateUiWithDetection(detections)
-            handleDetectionWithSpotify(detections)
+            val topDetection = detections.maxByOrNull { it.second }
+            if (topDetection != null) {
+                updateUiWithDetection(topDetection)
+                handleDetectionWithSpotify(topDetection)
+            }
+
 
         } catch (e: Exception) {
             Log.e(TAG, "Image processing error", e)
@@ -175,70 +178,27 @@ class CameraFragment : Fragment() {
         return Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true)
     }
 
-    private fun logDetections(detections: List<Pair<Int, Float>>) {
-        if (detections.isEmpty()) {
-            Log.d(TAG, "No detections above confidence threshold")
-            return
-        }
-
-        val grouped = detections.groupBy { it.first }
-
-        Log.d(TAG, "===== Detection Results =====")
-        Log.d(TAG, "Total detections: ${detections.size}")
-
-        grouped.forEach { (classId, classDetections) ->
-            val label = detectionHelper.getGestureLabel(classId)
-            val count = classDetections.size
-            val maxConfidence = classDetections.maxOf { it.second }
-            val avgConfidence = classDetections.map { it.second }.average()
-
-            Log.d(TAG, "Class: $label (ID: $classId)")
-            Log.d(TAG, "  Detections: $count")
-            Log.d(TAG, "  Max confidence: $maxConfidence")
-            Log.d(TAG, "  Avg confidence: $avgConfidence")
-
-            classDetections.sortedByDescending { it.second }
-                .take(3)
-                .forEachIndexed { i, (_, conf) ->
-                    Log.d(TAG, "    ${i+1}. Confidence: $conf")
-                }
-        }
-
-        val topDetection = detections.maxByOrNull { it.second }
-        topDetection?.let { (classId, confidence) ->
-            val label = detectionHelper.getGestureLabel(classId)
-            Log.d(TAG, "Top detection: $label with confidence $confidence")
-        }
-    }
-
-    private fun updateUiWithDetection(detections: List<Pair<Int, Float>>) {
+    private fun updateUiWithDetection(topDetection: Pair<Int, Float>) {
         activity?.runOnUiThread {
-            val topDetection = detections.maxByOrNull { it.second }
-            topDetection?.let { (classId, confidence) ->
+            topDetection.let { (classId, confidence) ->
                 val label = detectionHelper.getGestureLabel(classId)
                 binding.tvClassificationResult.text =
                     "$label (${(confidence * 100).toInt()}%)"
-            } ?: run {
-                binding.tvClassificationResult.text = "No gesture detected"
             }
         }
     }
 
-    private fun handleDetectionWithSpotify(detections: List<Pair<Int, Float>>){
-        val topDetection = detections.maxByOrNull { it.second }
-        topDetection?.let { (classId, confidence) ->
-            val label = detectionHelper.getGestureLabel(classId)
-            if (label == lastLabel){
-                if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
-                    callSpotifyFunction(label)
-                }
-            }else{
-                lastLabel = label
-                lastLabelTimestamp = System.currentTimeMillis()
-                callSpotifyFunction(label)
+    private fun handleDetectionWithSpotify(topDetection: Pair<Int, Float>){
+        val topDetectionLabel = detectionHelper.getGestureLabel(topDetection.first)
+
+        if (topDetectionLabel == lastLabel){
+            if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
+                callSpotifyFunction(topDetectionLabel)
             }
-        } ?: run {
-            Log.d(TAG, "Not calling Spotify - no gesture")
+        }else{
+            lastLabel = topDetectionLabel
+            lastLabelTimestamp = System.currentTimeMillis()
+            callSpotifyFunction(topDetectionLabel)
         }
     }
 
@@ -256,7 +216,7 @@ class CameraFragment : Fragment() {
                 "volumeDown" -> spotifyConnection.volumeDown()
                 "mute" -> spotifyConnection.mute()
                 "unmute" -> spotifyConnection.unmute()
-                else -> println("Unknown gesture")
+                else -> println("Unknown Gesture")
             }
         }
     }

@@ -1,10 +1,12 @@
 package com.example.gestify
 
+import ai.onnxruntime.OnnxJavaType
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.SystemClock
 import android.util.Log
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -23,7 +25,7 @@ class ObjectDetectionHelper(
         Log.d(TAG, "Initializing ONNX Runtime...")
         try {
             // Load the ONNX model
-            val modelBytes = context.assets.open("ten_gestures_full.onnx").use { inputStream ->
+            val modelBytes = context.assets.open("ten_gestures_course_3_half.onnx").use { inputStream ->
                 inputStream.readBytes()
             }
 
@@ -44,10 +46,15 @@ class ObjectDetectionHelper(
 
         return try {
             // Prepare input tensor
-            val inputTensor = prepareInputTensor(bitmap)
+            val inputTensor = prepareInputTensorFloat16(bitmap)
 
             // Run inference (replace "images" with your model's actual input name)
+            val startTime = SystemClock.uptimeMillis()
             val results = ortSession?.run(Collections.singletonMap("images", inputTensor))
+            val endTime = SystemClock.uptimeMillis()
+
+            val inferenceTime = endTime - startTime
+            Log.d("ONNX Inference Time", "Inference time: $inferenceTime ms")
 
             // Process results
             val output = results?.get(0)?.value as Array<Array<FloatArray>>
@@ -92,6 +99,55 @@ class ObjectDetectionHelper(
             longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong())
         )
     }
+
+    private fun prepareInputTensorFloat16(bitmap: Bitmap): OnnxTensor {
+        val resized = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
+        val floatArray = FloatArray(3 * inputSize * inputSize)
+        val intValues = IntArray(inputSize * inputSize)
+
+        resized.getPixels(intValues, 0, inputSize, 0, 0, inputSize, inputSize)
+
+        // Normalize and convert to CHW format
+        for (i in 0 until inputSize) {
+            for (j in 0 until inputSize) {
+                val pixel = intValues[i * inputSize + j]
+                floatArray[i * inputSize + j] = (pixel shr 16 and 0xFF) / 255.0f       // R
+                floatArray[inputSize * inputSize + i * inputSize + j] = (pixel shr 8 and 0xFF) / 255.0f  // G
+                floatArray[2 * inputSize * inputSize + i * inputSize + j] = (pixel and 0xFF) / 255.0f    // B
+            }
+        }
+
+        // Convert float array to float16 ByteBuffer
+        val byteBuffer = ByteBuffer.allocateDirect(floatArray.size * 2)
+            .order(ByteOrder.nativeOrder())
+
+        for (value in floatArray) {
+            byteBuffer.putShort(float32ToFloat16(value))
+        }
+        byteBuffer.rewind()
+
+        return OnnxTensor.createTensor(
+            ortEnvironment!!,
+            byteBuffer,
+            longArrayOf(1, 3, inputSize.toLong(), inputSize.toLong()),
+            OnnxJavaType.FLOAT16
+        )
+    }
+
+    fun float32ToFloat16(value: Float): Short {
+        val intBits = java.lang.Float.floatToIntBits(value)
+        val sign = (intBits ushr 16) and 0x8000
+        val valExponent = ((intBits ushr 23) and 0xFF) - 127 + 15
+        val mantissa = (intBits ushr 13) and 0x3FF
+
+        return when {
+            valExponent <= 0 -> (sign or 0).toShort()
+            valExponent >= 0x1F -> (sign or 0x7C00).toShort() // Inf
+            else -> (sign or (valExponent shl 10) or mantissa).toShort()
+        }
+    }
+
+
 
     private fun processOutput(output: Array<FloatArray>): List<Pair<Int, Float>> {
         val detections = mutableListOf<Pair<Int, Float>>()
