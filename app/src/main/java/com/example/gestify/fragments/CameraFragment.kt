@@ -18,6 +18,8 @@ import androidx.fragment.app.Fragment
 import com.example.gestify.ObjectDetectionHelper
 import com.example.gestify.SpotifyConnection
 import com.example.gestify.databinding.FragmentCameraBinding
+import java.io.File
+import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
@@ -150,13 +152,20 @@ class CameraFragment : Fragment() {
             val inputBuffer = prepareInputBuffer(bitmap)
 
             // run detection
-            val detections = detectionHelper.detectWithDetails(inputBuffer)
+            val detectionsAndInference = detectionHelper.detectWithDetails(inputBuffer)
+            val detections = detectionsAndInference.first
+            val inferenceTime = detectionsAndInference.second
             Log.d(TAG, "Processed 640x640 image, detections: ${detections.size}")
-
             // log detailed results
-            logDetections(detections)
-            updateUiWithDetection(detections)
-            handleDetectionWithSpotify(detections)
+            val topDetection = detections.maxByOrNull { it.second }
+
+            if (topDetection != null){
+                val topDetectionID = topDetection.first
+                val topDetectionConfidence = topDetection.second
+                val topDetectionLabel = topDetectionID.let { detectionHelper.getGestureLabel(it) }
+                updateUiWithDetection(topDetectionLabel, topDetectionConfidence)
+                handleDetectionWithSpotify(topDetectionLabel)
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Image processing error", e)
@@ -251,35 +260,24 @@ class CameraFragment : Fragment() {
         }
     }
 
-    private fun updateUiWithDetection(detections: List<Pair<Int, Float>>) {
+    private fun updateUiWithDetection(detectionLabel: String, detectionConfidence: Float) {
         activity?.runOnUiThread {
-            val topDetection = detections.maxByOrNull { it.second }
-            topDetection?.let { (classId, confidence) ->
-                val label = detectionHelper.getGestureLabel(classId)
                 binding.tvClassificationResult.text =
-                    "$label (${(confidence * 100).toInt()}%)"
+                    "$detectionLabel (${(detectionConfidence * 100).toInt()}%)"
             } ?: run {
                 binding.tvClassificationResult.text = "No gesture detected"
             }
-        }
     }
 
-    private fun handleDetectionWithSpotify(detections: List<Pair<Int, Float>>){
-        val topDetection = detections.maxByOrNull { it.second }
-        /* TO DO IS ADD COOL DOWN PERIOD / TWEAK THIS */
-        topDetection?.let { (classId, confidence) ->
-            val label = detectionHelper.getGestureLabel(classId)
-            if (label == lastLabel){
-                if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
-                    callSpotifyFunction(label)
-                }
-            }else{
-                lastLabel = label
-                lastLabelTimestamp = System.currentTimeMillis()
-                callSpotifyFunction(label)
+    private fun handleDetectionWithSpotify(detectionLabel: String){
+        if (detectionLabel == lastLabel){
+            if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
+                callSpotifyFunction(detectionLabel)
             }
-        } ?: run {
-            Log.d(TAG, "Not calling Spotify - no gesture")
+        }else{
+            lastLabel = detectionLabel
+            lastLabelTimestamp = System.currentTimeMillis()
+            callSpotifyFunction(detectionLabel)
         }
     }
 

@@ -1,6 +1,7 @@
 package com.example.gestify
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
@@ -27,21 +28,27 @@ class ObjectDetectionHelper(
         }
     }
 
-    fun detectWithDetails(inputBuffer: ByteBuffer): List<Pair<Int, Float>> {
+    fun detectWithDetails(inputBuffer: ByteBuffer): Pair<List<Pair<Int, Float>>, Long> {
         if (interpreter == null) {
             Log.e(TAG, "Interpreter is null!")
-            return emptyList()
+            return Pair(emptyList(), (0.0).toLong())
         }
 
         val output = Array(1) { Array(14) { FloatArray(8400) } }
 
         return try {
+            val startTime = SystemClock.uptimeMillis()
             interpreter?.run(inputBuffer, output)
-            processOutput(output[0])
+            val endTime = SystemClock.uptimeMillis()
+            val inferenceTimeMSeconds = (endTime - startTime)
+            val inferenceTimeSeconds = inferenceTimeMSeconds / 1000.0
+            Log.d("TFLite Inference Time", "Inference time: $inferenceTimeSeconds s")
+            val detections = processOutput(output[0])
+            Pair(detections, inferenceTimeMSeconds)
 
         } catch (e: Exception) {
             Log.e(TAG, "Inference error", e)
-            emptyList()
+            Pair(emptyList(), (0.0).toLong())
         }
     }
 
