@@ -3,7 +3,6 @@ package com.example.gestify.fragments
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
@@ -38,7 +37,8 @@ class CameraFragment : Fragment() {
         "one" to "play",
         "two_up" to "pause",
         "fist" to "mute",
-        "palm" to "unmute"
+        "palm" to "unmute",
+        "middle_finger" to "surprise"
     )
 
     private var lastLabel: String? = null
@@ -216,6 +216,7 @@ class CameraFragment : Fragment() {
                 "volumeDown" -> spotifyConnection.volumeDown()
                 "mute" -> spotifyConnection.mute()
                 "unmute" -> spotifyConnection.unmute()
+                "surprise" -> spotifyConnection.surprise()
                 else -> println("Unknown Gesture")
             }
         }

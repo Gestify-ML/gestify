@@ -15,7 +15,7 @@ import java.util.Collections
 
 class ObjectDetectionHelper(
     private val context: Context,
-    private val confidenceThreshold: Float = 0.5f
+    private val confidenceThreshold: Float = 0.7f
 ) {
     private var ortEnvironment: OrtEnvironment? = null
     private var ortSession: OrtSession? = null
@@ -25,7 +25,7 @@ class ObjectDetectionHelper(
         Log.d(TAG, "Initializing ONNX Runtime...")
         try {
             // Load the ONNX model
-            val modelBytes = context.assets.open("ten_gestures_course_3_half.onnx").use { inputStream ->
+            val modelBytes = context.assets.open("ten_gestures_full.onnx").use { inputStream ->
                 inputStream.readBytes()
             }
 
@@ -46,7 +46,7 @@ class ObjectDetectionHelper(
 
         return try {
             // Prepare input tensor
-            val inputTensor = prepareInputTensorFloat16(bitmap)
+            val inputTensor = prepareInputTensor(bitmap)
 
             // Run inference (replace "images" with your model's actual input name)
             val startTime = SystemClock.uptimeMillis()

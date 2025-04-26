@@ -12,7 +12,6 @@ import com.spotify.android.appremote.api.SpotifyAppRemote
 import com.spotify.sdk.android.auth.AuthorizationClient
 import com.spotify.sdk.android.auth.AuthorizationRequest
 import com.spotify.sdk.android.auth.AuthorizationResponse
-import kotlin.random.Random
 
 class SpotifyConnection(private val context: Context, private val musicStatus: TextView) {
 
@@ -20,19 +19,9 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
     private val clientId = BuildConfig.SPOTIFY_CLIENT_ID
     private val redirectUri = "com.example.gestify://callback"
 
-
-    private val trackInfo = mutableStateOf("Track Info: ")
     private val trackState = mutableStateOf("Not playing")
 
-    private val trackUris = listOf(
-        "spotify:track:4xdBrk0nFZaP54vvZj0yx7",
-        "spotify:track:2PmMh2t7jAtN6cqFooA0Xy",
-        "spotify:track:2Y8BloifAHEn6GproQgPs7",
-        "spotify:track:0RW1UL8w8rjQkaIaljaFc5",
-        "spotify:track:6dBUzqjtbnIa1TwYbyw5CM"
-    )
-
-    public var isSpotifyConnected: Boolean = false
+    var isSpotifyConnected: Boolean = false
 
     fun initiateSpotifyLogin(activity: androidx.activity.ComponentActivity) {
         val builder = AuthorizationRequest.Builder(clientId, AuthorizationResponse.Type.TOKEN, redirectUri)
@@ -42,7 +31,7 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
         activity.registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
             val response = AuthorizationClient.getResponse(result.resultCode, result.data)
             if (response.type == AuthorizationResponse.Type.TOKEN) {
-                connectToSpotify(response.accessToken)
+                connectToSpotify()
             } else {
                 Toast.makeText(context, "Authorization Error: ${response.error}", Toast.LENGTH_SHORT).show()
             }
@@ -50,7 +39,7 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
 
     }
 
-    private fun connectToSpotify(accessToken: String) {
+    private fun connectToSpotify() {
         val connectionParams = ConnectionParams.Builder(clientId)
             .setRedirectUri(redirectUri)
             .showAuthView(true)
@@ -61,7 +50,7 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
                 this@SpotifyConnection.spotifyAppRemote = spotifyAppRemote
                 Log.d("SpotifyConnection", "Connected to Spotify")
                 isSpotifyConnected = true
-                playRandomTrack()
+                resumeSongOrPlayPlaylist()
                 subscribeToPlayerState()
             }
 
@@ -82,15 +71,20 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
         }
     }
 
-    fun playRandomTrack() {
-        val randomTrackUri = trackUris[Random.nextInt(trackUris.size)]
-
-        // Play the random track
-        spotifyAppRemote?.playerApi?.play(randomTrackUri)?.setResultCallback {
-            Log.d("SpotifyConnection", "Random track is playing!")
-        }?.setErrorCallback {
-            Log.e("SpotifyConnection", "Error playing track: ${it.message}")
-        }
+    fun resumeSongOrPlayPlaylist() {
+        spotifyAppRemote?.playerApi
+            ?.playerState
+            ?.setResultCallback { playerState ->
+                if (playerState.track != null) {
+                    // user was already listening to something - resume if paused
+                    if (playerState.isPaused) {
+                        spotifyAppRemote!!.playerApi.resume()
+                    }
+                } else {
+                    // no current playback - start clean playlist
+                    spotifyAppRemote!!.playerApi.play("spotify:playlist:0AmPefBC0ycNk94cMzgUAk")
+                }
+            }
     }
 
     fun pauseTrack() {
@@ -122,6 +116,19 @@ class SpotifyConnection(private val context: Context, private val musicStatus: T
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val defaultVolume = maxVolume / 2 // Set it to 50% of max volume
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, defaultVolume, AudioManager.FLAG_SHOW_UI)
+    }
+
+    fun surprise(){
+        queueTrack("spotify:track:2n5sAzeWh5LqnV9cGBjgGr")
+        skipTrack()
+        spotifyAppRemote?.playerApi?.seekToRelativePosition(3000)
+    }
+
+    fun queueTrack(trackID: String) {
+        spotifyAppRemote?.playerApi?.queue(trackID) // Adds to queue
+            ?.setResultCallback {
+                Log.d("Spotify", "Track added to queue!")
+            }
     }
 
     fun rewindTrack() {
