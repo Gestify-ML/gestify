@@ -118,6 +118,9 @@ dependencies {
     implementation(libs.tensorflow.lite.task.vision)
     implementation(libs.tensorflow.lite.support)
 
+    //ONNX
+    implementation(libs.onnxruntime.android)
+
     // Spotify
     implementation(libs.spotify.auth)
     implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))

@@ -3,7 +3,6 @@ package com.example.gestify.fragments
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.Matrix
 import android.os.Bundle
 import android.util.Log
@@ -18,10 +17,6 @@ import androidx.fragment.app.Fragment
 import com.example.gestify.ObjectDetectionHelper
 import com.example.gestify.SpotifyConnection
 import com.example.gestify.databinding.FragmentCameraBinding
-import java.io.File
-import java.io.FileOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -30,7 +25,6 @@ class CameraFragment : Fragment() {
     private val binding get() = _binding!!
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var detectionHelper: ObjectDetectionHelper
-    private val inputSize = 640
     private var camera: Camera? = null
     private lateinit var spotifyConnection: SpotifyConnection
 
@@ -43,7 +37,8 @@ class CameraFragment : Fragment() {
         "one" to "play",
         "two_up" to "pause",
         "fist" to "mute",
-        "palm" to "unmute"
+        "palm" to "unmute",
+        "middle_finger" to "surprise"
     )
 
     private var lastLabel: String? = null
@@ -67,7 +62,6 @@ class CameraFragment : Fragment() {
         detectionHelper = ObjectDetectionHelper(requireContext())
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        // request camera permissions if needed
         if (allPermissionsGranted()) {
             binding.viewFinder.post { setupCamera() }
         } else {
@@ -98,7 +92,6 @@ class CameraFragment : Fragment() {
     }
 
     private fun bindCameraUseCases(cameraProvider: ProcessCameraProvider) {
-        // preview
         val preview = Preview.Builder()
             .setTargetAspectRatio(AspectRatio.RATIO_16_9)
             .setTargetRotation(binding.viewFinder.display.rotation)
@@ -107,9 +100,8 @@ class CameraFragment : Fragment() {
                 it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
             }
 
-        // image analysis
         val imageAnalyzer = ImageAnalysis.Builder()
-            .setTargetResolution(Size(640, 640)) // This helps with performance
+            .setTargetResolution(Size(640, 640))
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
@@ -121,15 +113,12 @@ class CameraFragment : Fragment() {
             }
 
         try {
-            // unbind all use cases first
             cameraProvider.unbindAll()
 
-            // select front camera
             val cameraSelector = CameraSelector.Builder()
                 .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
                 .build()
 
-            // bind use cases
             camera = cameraProvider.bindToLifecycle(
                 viewLifecycleOwner,
                 cameraSelector,
@@ -145,27 +134,17 @@ class CameraFragment : Fragment() {
         try {
             Log.d(TAG, "Processing image ${image.width}x${image.height}")
 
-            // convert
+            // Convert to bitmap and process
             val bitmap = toBitmap(image)
-
-            // prepare input buffer
-            val inputBuffer = prepareInputBuffer(bitmap)
-
-            // run detection
-            val detectionsAndInference = detectionHelper.detectWithDetails(inputBuffer)
-            val detections = detectionsAndInference.first
-            val inferenceTime = detectionsAndInference.second
+            val detections = detectionHelper.detectWithDetails(bitmap)
             Log.d(TAG, "Processed 640x640 image, detections: ${detections.size}")
-            // log detailed results
-            val topDetection = detections.maxByOrNull { it.second }
 
-            if (topDetection != null){
-                val topDetectionID = topDetection.first
-                val topDetectionConfidence = topDetection.second
-                val topDetectionLabel = topDetectionID.let { detectionHelper.getGestureLabel(it) }
-                updateUiWithDetection(topDetectionLabel, topDetectionConfidence)
-                handleDetectionWithSpotify(topDetectionLabel)
+            val topDetection = detections.maxByOrNull { it.second }
+            if (topDetection != null) {
+                updateUiWithDetection(topDetection)
+                handleDetectionWithSpotify(topDetection)
             }
+
 
         } catch (e: Exception) {
             Log.e(TAG, "Image processing error", e)
@@ -181,103 +160,45 @@ class CameraFragment : Fragment() {
         val width = image.width
         val height = image.height
 
-        // create bitmap and copy pixel data
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         buffer.rewind()
         bitmap.copyPixelsFromBuffer(buffer)
 
-        // calculate total required rotation
         val sensorRotation = image.imageInfo.rotationDegrees
-        val additionalRotation = 180 // The extra rotation you need
+        val additionalRotation = 180
         val totalRotation = (sensorRotation + additionalRotation) % 360
 
-        // create transformation matrix
         val matrix = Matrix().apply {
-            // apply mirroring for front camera first
             if (camera?.cameraInfo?.lensFacing == CameraSelector.LENS_FACING_FRONT) {
                 postScale(-1f, 1f, width / 2f, height / 2f)
             }
-
-            //  apply the combined rotation
             postRotate(totalRotation.toFloat(), width / 2f, height / 2f)
         }
 
         return Bitmap.createBitmap(bitmap, 0, 0, width, height, matrix, true)
     }
 
-    private fun prepareInputBuffer(bitmap: Bitmap): ByteBuffer {
-        val resized = Bitmap.createScaledBitmap(bitmap, inputSize, inputSize, true)
-        return ByteBuffer.allocateDirect(inputSize * inputSize * 3 * 4).apply {
-            order(ByteOrder.nativeOrder())
-            val pixels = IntArray(inputSize * inputSize)
-            resized.getPixels(pixels, 0, inputSize, 0, 0, inputSize, inputSize)
-
-            for (pixel in pixels) {
-                putFloat(Color.red(pixel) / 255f)
-                putFloat(Color.green(pixel) / 255f)
-                putFloat(Color.blue(pixel) / 255f)
-            }
-            rewind()
-        }
-    }
-
-    private fun logDetections(detections: List<Pair<Int, Float>>) {
-        if (detections.isEmpty()) {
-            Log.d(TAG, "No detections above confidence threshold")
-            return
-        }
-
-        // group detections by class
-        val grouped = detections.groupBy { it.first }
-
-        Log.d(TAG, "===== Detection Results =====")
-        Log.d(TAG, "Total detections: ${detections.size}")
-
-        grouped.forEach { (classId, classDetections) ->
-            val label = detectionHelper.getGestureLabel(classId)
-            val count = classDetections.size
-            val maxConfidence = classDetections.maxOf { it.second }
-            val avgConfidence = classDetections.map { it.second }.average()
-
-            Log.d(TAG, "Class: $label (ID: $classId)")
-            Log.d(TAG, "  Detections: $count")
-            Log.d(TAG, "  Max confidence: $maxConfidence")
-            Log.d(TAG, "  Avg confidence: $avgConfidence")
-
-            // log top 3 detections for this class
-            classDetections.sortedByDescending { it.second }
-                .take(3)
-                .forEachIndexed { i, (_, conf) ->
-                    Log.d(TAG, "    ${i+1}. Confidence: $conf")
-                }
-        }
-
-        // log top detection overall
-        val topDetection = detections.maxByOrNull { it.second }
-        topDetection?.let { (classId, confidence) ->
-            val label = detectionHelper.getGestureLabel(classId)
-            Log.d(TAG, "Top detection: $label with confidence $confidence")
-        }
-    }
-
-    private fun updateUiWithDetection(detectionLabel: String, detectionConfidence: Float) {
+    private fun updateUiWithDetection(topDetection: Pair<Int, Float>) {
         activity?.runOnUiThread {
+            topDetection.let { (classId, confidence) ->
+                val label = detectionHelper.getGestureLabel(classId)
                 binding.tvClassificationResult.text =
-                    "$detectionLabel (${(detectionConfidence * 100).toInt()}%)"
-            } ?: run {
-                binding.tvClassificationResult.text = "No gesture detected"
+                    "$label (${(confidence * 100).toInt()}%)"
             }
+        }
     }
 
-    private fun handleDetectionWithSpotify(detectionLabel: String){
-        if (detectionLabel == lastLabel){
+    private fun handleDetectionWithSpotify(topDetection: Pair<Int, Float>){
+        val topDetectionLabel = detectionHelper.getGestureLabel(topDetection.first)
+
+        if (topDetectionLabel == lastLabel){
             if (System.currentTimeMillis() - lastLabelTimestamp >= labelChangeThreshold) {
-                callSpotifyFunction(detectionLabel)
+                callSpotifyFunction(topDetectionLabel)
             }
         }else{
-            lastLabel = detectionLabel
+            lastLabel = topDetectionLabel
             lastLabelTimestamp = System.currentTimeMillis()
-            callSpotifyFunction(detectionLabel)
+            callSpotifyFunction(topDetectionLabel)
         }
     }
 
@@ -295,7 +216,8 @@ class CameraFragment : Fragment() {
                 "volumeDown" -> spotifyConnection.volumeDown()
                 "mute" -> spotifyConnection.mute()
                 "unmute" -> spotifyConnection.unmute()
-                else -> println("Unknown gesture")
+                "surprise" -> spotifyConnection.surprise()
+                else -> println("Unknown Gesture")
             }
         }
     }
@@ -303,7 +225,7 @@ class CameraFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         cameraExecutor.shutdown()
-
+        detectionHelper.close()
         super.onDestroyView()
     }
 
